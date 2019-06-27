@@ -1,0 +1,7 @@
+.classpath
+target/
+.idea/
+*.iml
+manageTriggers_*
+*.patch
+*.log

@@ -1,0 +1,247 @@
+<script>
+    function autocomplete(inp, arr) {
+        /*the autocomplete function takes two arguments,
+        the text field element and an array of possible autocompleted values:*/
+        var currentFocus;
+        /*execute a function when someone writes in the text field:*/
+        inp.addEventListener("input", function(e) {
+            var a, b, i, val = this.value;
+            /*close any already open lists of autocompleted values*/
+            closeAllLists();
+            if (!val) { return false;}
+            currentFocus = -1;
+            /*create a DIV element that will contain the items (values):*/
+            a = document.createElement("DIV");
+            a.setAttribute("id", this.id + "autocomplete-list");
+            a.setAttribute("class", "autocomplete-items");
+            /*append the DIV element as a child of the autocomplete container:*/
+            this.parentNode.appendChild(a);
+            /*for each item in the array...*/
+            for (i = 0; i < arr.length; i++) {
+                /*check if the item starts with the same letters as the text field value:*/
+                if (arr[i].substr(0, val.length).toUpperCase() == val.toUpperCase()) {
+                    /*create a DIV element for each matching element:*/
+                    b = document.createElement("DIV");
+                    /*make the matching letters bold:*/
+                    b.innerHTML = "<strong>" + arr[i].substr(0, val.length) + "</strong>";
+                    b.innerHTML += arr[i].substr(val.length);
+                    /*insert a input field that will hold the current array item's value:*/
+                    b.innerHTML += "<input type='hidden' value='" + arr[i] + "'>";
+                    /*execute a function when someone clicks on the item value (DIV element):*/
+                    b.addEventListener("click", function(e) {
+                        /*insert the value for the autocomplete text field:*/
+                        inp.value = this.getElementsByTagName("input")[0].value;
+                        /*close the list of autocompleted values,
+                        (or any other open lists of autocompleted values:*/
+                        closeAllLists();
+                    });
+                    a.appendChild(b);
+                }
+            }
+        });
+        /*execute a function presses a key on the keyboard:*/
+        inp.addEventListener("keydown", function(e) {
+            var x = document.getElementById(this.id + "autocomplete-list");
+            if (x) x = x.getElementsByTagName("div");
+            if (e.keyCode == 40) {
+                /*If the arrow DOWN key is pressed,
+                increase the currentFocus variable:*/
+                currentFocus++;
+                /*and and make the current item more visible:*/
+                addActive(x);
+            } else if (e.keyCode == 38) { //up
+                /*If the arrow UP key is pressed,
+                decrease the currentFocus variable:*/
+                currentFocus--;
+                /*and and make the current item more visible:*/
+                addActive(x);
+            } else if (e.keyCode == 13) {
+                /*If the ENTER key is pressed, prevent the form from being submitted,*/
+                e.preventDefault();
+                if (currentFocus > -1) {
+                    /*and simulate a click on the "active" item:*/
+                    if (x) x[currentFocus].click();
+                }
+            }
+        });
+        function addActive(x) {
+            /*a function to classify an item as "active":*/
+            if (!x) return false;
+            /*start by removing the "active" class on all items:*/
+            removeActive(x);
+            if (currentFocus >= x.length) currentFocus = 0;
+            if (currentFocus < 0) currentFocus = (x.length - 1);
+            /*add class "autocomplete-active":*/
+            x[currentFocus].classList.add("autocomplete-active");
+        }
+        function removeActive(x) {
+            /*a function to remove the "active" class from all autocomplete items:*/
+            for (var i = 0; i < x.length; i++) {
+                x[i].classList.remove("autocomplete-active");
+            }
+        }
+        function closeAllLists(elmnt) {
+            /*close all autocomplete lists in the document,
+            except the one passed as an argument:*/
+            var x = document.getElementsByClassName("autocomplete-items");
+            for (var i = 0; i < x.length; i++) {
+                if (elmnt != x[i] && elmnt != inp) {
+                    x[i].parentNode.removeChild(x[i]);
+                }
+            }
+        }
+        /*execute a function when someone clicks in the document:*/
+        document.addEventListener("click", function (e) {
+            closeAllLists(e.target);
+        });
+    }</script>
+<script>/**
+ * SPARQL processor is a javascript library to query a sparql endpoint.
+ * It has been developed in the context of the PON project PRISMA - PiattafoRme cloud Interoperbili per SMArt-government,
+ * and it is release under the CC-BY 2.0 license (see http://creativecommons.org/licenses/by/2.0/)
+ *
+ * @author Cristiano Longo, Andrea Costazza.
+ */
+
+/**
+ * Perform a query against the specified endpoint and process results by the
+ * given processor object. The queryProcessor object must have the attribute query,
+ * which returns the query which will be performed against the specified endpoint,
+ * and the two methods
+ * process(row) , which will be invoked to process each row in the result set (sequentially) and
+ * flush(), which is called  when all the result set rows has been processed.
+ *
+ * @param endpoint URI of the sparql endpoint
+ * @param queryProcessor is an object delegate to specify the uery and handle the query result
+ */
+function sparql_query(endpoint, queryProcessor){
+    var querypart = "query=" + escape(queryProcessor.query);
+    // Get our HTTP request object.
+    var xmlhttp = getHTTPObject();
+    //Include POST OR GET
+    xmlhttp.open('POST', endpoint, true);
+    xmlhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    xmlhttp.setRequestHeader("Accept", "application/sparql-results+json");
+    xmlhttp.onreadystatechange = function() {
+        if(xmlhttp.readyState==4 ){
+            if(xmlhttp.status==200){
+                //Request accept
+                var resultAsJson=eval('(' + xmlhttp.responseText + ')');
+                for(var i = 0; i<  resultAsJson.results.bindings.length; i++) {
+                    queryProcessor.process(resultAsJson.results.bindings[i]);
+                }
+                queryProcessor.flush();
+            } else {
+                // Some kind of error occurred.
+                alert("Sparql query error: " + xmlhttp.status + " "
+                    + xmlhttp.responseText);
+            }
+        }
+    }
+    xmlhttp.send(querypart);
+}
+
+//Request HTTP
+function getHTTPObject(){
+    var xmlhttp;
+    if(!xmlhttp && typeof XMLHttpRequest != 'undefined'){
+        try{
+            // Code for old browser
+            xmlhttp=new ActiveXObject('Msxml2.XMLHTTP');
+        }
+        catch(err){
+            try{
+                // Code for IE6, IE5
+                xmlhttp=new ActiveXObject("Microsoft.XMLHTTP");
+            }
+            catch(err2){
+                try{
+                    // Code for IE7+, Firefox, Chrome, Opera, Safari
+                    xmlhttp=new XMLHttpRequest();
+                }
+                catch(err3){
+                    xmlhttp=false
+                }
+            }
+        }
+    }
+    return xmlhttp;
+}</script>
+<script>function runProcessorValues(srcElement){
+
+    alert('0');
+    alert('We are printing: '+srcElement);
+    var div = document.createElement("div");
+    div.style.background = "red";
+    div.style.color = "white";
+    div.id = srcElement+'values';
+    div.style.display = "block";
+    document.getElementById(srcElement).appendChild(div);	var list=document.createElement("ul");
+    div.appendChild(list);
+    var summary=document.createElement("p");
+
+    //the query processor
+    function Processor(list, summary){
+        this.n=0;
+        this.list=list;
+        this.summary=summary;
+
+        alert('3');
+        //define the query
+        this.query = "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> SELECT distinct ?concept ?pred WHERE { ?sub rdfs:label ?concept.}";
+
+        //and methods to handle the query results
+        this.process = function(row){
+            var item=document.createElement("li");
+            alert('4');
+            item.innerHTML=row.concept.value+";
+            this.list.appendChild(item);
+            alert('5');
+            this.n++;
+        };
+
+        //show the results count as summary
+        this.flush = function(){
+            this.summary.innerHTML="Found "+this.n+" classes.";
+        };
+    }
+
+    //finally run the query
+    //sparql_query("http://dbpedia.org/sparql", new Processor(list, summary));
+    sparql_query("http://localhost:8089/parliament/sparql", new Processor(list, summary));
+
+    srcElement.disabled=true;
+}</script>
+<button onclick="runProcessorValues(this);">Run Example</button>
+<script>function showHideFilterElements(element, button) {
+    var x = document.getElementById(element);
+    var y = document.getElementById(button).value;
+    if (y === "-"){
+        document.getElementById(button).value="+";
+        document.getElementById(element+'values').style.display = "none";
+    }
+    else{
+        document.getElementById(button).value="-";
+        if (document.getElementById(element+'values')==null){alert('if'); runProcessorValues(element);
+
+        } else{alert('else');document.getElementById(element+'values').style.display = "block";} }}</script>
+<h3>Select the visible element</h3>
+<form autocomplete="off" action="filtersearch4">
+    <input type="submit" value="Narrow the results"><br>
+    Types
+    <div class='filterProperty'><input type="checkbox" name="typeCheckbox" value="Building (geohive)">Building (geohive)(496) </div>
+    <div class='filterProperty'><input type="checkbox" name="typeCheckbox" value="Feature (geo)">Feature (geo)(522) </div>
+    <div class='filterProperty'><input type="checkbox" name="typeCheckbox" value="County (geohive)">County (geohive)(26) </div>
+    <div class='filterProperty'><input type="checkbox" name="typeCheckbox" value="Geometry (geo)">Geometry (geo)(522) </div>
+    <br>
+    Properties
+    <div class='filterProperty' id='inDataset (VoID)filterDiv'><input id="inDataset (VoID)Button" type="button" onclick="showHideFilterElements('inDataset (VoID)filterDiv', 'inDataset (VoID)Button')" value="+">inDataset (VoID)(1 element(s)) </div>
+    <div class='filterProperty' id='hasForm (geoff)filterDiv'><input id="hasForm (geoff)Button" type="button" onclick="showHideFilterElements('hasForm (geoff)filterDiv', 'hasForm (geoff)Button')" value="+">hasForm (geoff)(1488 element(s)) </div>
+    <div class='filterProperty' id='hasFunction (geoff)filterDiv'><input id="hasFunction (geoff)Button" type="button" onclick="showHideFilterElements('hasFunction (geoff)filterDiv', 'hasFunction (geoff)Button')" value="+">hasFunction (geoff)(1488 element(s)) </div>
+    <div class='filterProperty' id='asWKT (geo)filterDiv'><input id="asWKT (geo)Button" type="button" onclick="showHideFilterElements('asWKT (geo)filterDiv', 'asWKT (geo)Button')" value="+">asWKT (geo)(1514 element(s)) </div>
+    <div class='filterProperty' id='hasGeometry (geo)filterDiv'><input id="hasGeometry (geo)Button" type="button" onclick="showHideFilterElements('hasGeometry (geo)filterDiv', 'hasGeometry (geo)Button')" value="+">hasGeometry (geo)(1514 element(s)) </div>
+    <div class='filterProperty' id='label (rdfs)filterDiv'><input id="label (rdfs)Button" type="button" onclick="showHideFilterElements('label (rdfs)filterDiv', 'label (rdfs)Button')" value="+">label (rdfs)(3054 element(s)) </div>
+    <div class='filterProperty' id='lastUpdate (geohive)filterDiv'><input id="lastUpdate (geohive)Button" type="button" onclick="showHideFilterElements('lastUpdate (geohive)filterDiv', 'lastUpdate (geohive)Button')" value="+">lastUpdate (geohive)(1488 element(s)) </div>
+    <br>
+    <input type="submit" value="Narrow the results"><br>
+    <h3>Select the visible element above</h3>
